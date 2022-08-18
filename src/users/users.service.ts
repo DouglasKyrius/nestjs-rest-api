@@ -1,30 +1,49 @@
-import { Injectable } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { CreateUserDTO } from './dto/create-user.dto';
+import { UpdateUserDTO } from './dto/update-user.dto';
+import { User } from './entities/user.entity';
+
+function notFoundUser(id: string) {
+  throw new NotFoundException(`User with ID=${id} not found`);
+}
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return `This action adds a new user, with ${JSON.stringify(
-      createUserDto,
-    )} fields`;
+  @InjectRepository(User)
+  userRepository: Repository<User>;
+
+  create(createUserDto: CreateUserDTO) {
+    const user = this.userRepository.create(createUserDto);
+    return this.userRepository.save(user);
   }
 
   findAll(limit: number, offset: number) {
-    return `This action returns all users with pagination limit: ${limit}, offset: ${offset}`;
+    return this.userRepository.find({
+      skip: offset,
+      take: limit,
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: string) {
+    const user = await this.userRepository.findOneBy({ id });
+    if (!user) notFoundUser(id);
+    return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user, with ${JSON.stringify(
-      updateUserDto,
-    )} fields`;
+  async update(id: string, updateUserDto: UpdateUserDTO) {
+    const user = await this.userRepository.preload({
+      id,
+      ...updateUserDto,
+    });
+    if (!user) notFoundUser(id);
+    return this.userRepository.save(user);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async remove(id: string) {
+    const user = await this.userRepository.findOneBy({ id });
+    if (!user) notFoundUser(id);
+    return this.userRepository.remove(user);
   }
 }
